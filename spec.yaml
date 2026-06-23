@@ -1,0 +1,346 @@
+id: fire_severity_dnbr_er
+
+requirements:
+  - name: "ecoscope-platform"
+    version: ">=2.11.3,<3"
+    channel: "https://repo.prefix.dev/ecoscope-workflows/"
+  - name: "dnbr-tasks"
+    path: "/home/sam/Ecoscope_Projects/dnbr-tasks"
+    editable: true
+  - name: "hex-tasks"
+    path: "/home/sam/Ecoscope_Projects/hex-tasks"
+    editable: true
+
+rjsf-overrides:
+  properties:
+    overlay_name.properties.group_name.ecoscope:transform:
+      - transformer: EarthRangerEnumResolver
+        transformer_kws:
+          type: spatial_feature_group
+          depends_on: properties.er_connection.properties.data_source.properties.name
+
+workflow:
+
+  # --- Metadata ---------------------------------------------------------------
+  - name: Workflow Details
+    id: workflow_details
+    task: set_workflow_details
+
+  # --- EarthRanger connection (for fetching the fire event polygon) ------------
+  - name: EarthRanger
+    id: er_connection
+    task: set_er_connection
+
+  # --- Google Earth Engine connection -----------------------------------------
+  - name: Earth Engine
+    id: gee_connection
+    task: set_gee_connection
+
+  # --- Fetch fire event polygon from ER by serial number ----------------------
+  - name: Fire Event
+    id: fire_event
+    task: load_fire_event_from_er
+    partial:
+      client: ${{ workflow.er_connection.return }}
+
+  # --- Extract fire date from ER event_time -----------------------------------
+  - name: Fire Date
+    id: fire_date
+    task: extract_fire_date
+    partial:
+      event_gdf: ${{ workflow.fire_event.return }}
+
+  # --- Optional overlay group name (leave blank to skip overlay layer) --------
+  - name: Overlay Layer Group Name
+    id: overlay_name
+    task: set_overlay_group_name
+
+  # --- Fetch overlay from ER (skipped if name is empty) ----------------------
+  - name: Overlay Features
+    id: overlay_features
+    task: get_spatial_features_group
+    skipif:
+      conditions:
+        - any_dependency_is_empty_string
+    partial:
+      client: ${{ workflow.er_connection.return }}
+      spatial_features_group_name: ${{ workflow.overlay_name.return }}
+
+  # --- Basemap picker ----------------------------------------------------------
+  - name: Base Maps
+    id: base_maps
+    task: set_base_maps
+
+  # --- Landsat mean composite dNBR computation --------------------------------
+  - name: Compute dNBR
+    id: dnbr_result
+    task: calculate_dnbr
+    partial:
+      client: ${{ workflow.gee_connection.return }}
+      roi: ${{ workflow.fire_event.return }}
+      fire_date: ${{ workflow.fire_date.return }}
+
+  # --- Build severity pixel layer for the map ---------------------------------
+  - name: dNBR Severity Layer
+    id: dnbr_layer
+    task: create_dnbr_layer
+    partial:
+      geodataframe: ${{ workflow.dnbr_result.return }}
+
+  # --- Overlay layer ----------------------------------------------------------
+  - name: Overlay Layer
+    id: overlay_layer
+    task: create_styled_overlay_layer
+    skipif:
+      conditions:
+        - any_dependency_skipped
+        - any_is_empty_df
+    partial:
+      geodataframe: ${{ workflow.overlay_features.return }}
+
+  # --- Combine dNBR severity layer + optional overlay -------------------------
+  - name: Combined Layers
+    id: combined_layers
+    task: combine_map_layers
+    skipif:
+      conditions:
+        - any_is_empty_df
+    partial:
+      hex_layer: ${{ workflow.dnbr_layer.return }}
+      boundary_layer: ~
+      overlay_layer: ${{ workflow.overlay_layer.return }}
+
+  # --- Render fire severity map -----------------------------------------------
+  - name: Fire Severity Map
+    id: severity_map
+    task: draw_ecomap
+    skipif:
+      conditions:
+        - any_is_empty_df
+        - any_dependency_skipped
+    partial:
+      title: null
+      tile_layers: ${{ workflow.base_maps.return }}
+      geo_layers: ${{ workflow.combined_layers.return }}
+      north_arrow_style:
+        placement: top-left
+      legend_style:
+        title: Fire Severity
+        placement: bottom-right
+      static: false
+      max_zoom: 20
+
+  # --- Persist map HTML -------------------------------------------------------
+  - name: Persist Map
+    id: severity_map_url
+    task: persist_text
+    skipif:
+      conditions:
+        - any_is_empty_df
+        - any_dependency_skipped
+    partial:
+      root_path: ${{ env.ECOSCOPE_WORKFLOWS_RESULTS }}
+      filename_suffix: dnbr
+      text: ${{ workflow.severity_map.return }}
+
+  # --- Map widget (always shown so the dashboard panel is never blank) --------
+  - name: Map Widget
+    id: map_widget
+    task: create_map_widget_single_view
+    skipif:
+      conditions:
+        - never
+    partial:
+      title: Fire Severity Map
+      data: ${{ workflow.severity_map_url.return }}
+
+  # --- Burned area stat (Low severity or higher) ------------------------------
+  - name: Burned Area
+    id: burned_area_ha
+    task: count_burned_area_ha
+    skipif:
+      conditions:
+        - any_is_empty_df
+        - any_dependency_skipped
+    partial:
+      geodataframe: ${{ workflow.dnbr_result.return }}
+
+  - name: Burned Area Formatted
+    id: burned_area_fmt
+    task: format_area_ha
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      area_ha: ${{ workflow.burned_area_ha.return }}
+
+  - name: Widget - Burned
+    id: widget_burned
+    task: create_text_widget_single_view
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      title: Burned
+      data: ${{ workflow.burned_area_fmt.return }}
+
+  # --- High-severity area stat (Moderate-High or higher) ---------------------
+  - name: High Severity Area
+    id: high_severity_ha
+    task: count_high_severity_area_ha
+    skipif:
+      conditions:
+        - any_is_empty_df
+        - any_dependency_skipped
+    partial:
+      geodataframe: ${{ workflow.dnbr_result.return }}
+
+  - name: High Severity Area Formatted
+    id: high_severity_fmt
+    task: format_area_ha
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      area_ha: ${{ workflow.high_severity_ha.return }}
+
+  - name: Widget - High Severity
+    id: widget_high_severity
+    task: create_text_widget_single_view
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      title: High Sev
+      data: ${{ workflow.high_severity_fmt.return }}
+
+  # --- Fire date context widget -----------------------------------------------
+  - name: Widget - Fire Date
+    id: widget_fire_date
+    task: create_text_widget_single_view
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      title: Date
+      data: ${{ workflow.fire_date.return }}
+
+  # --- Overlay display name (shows "—" if no overlay selected) ---------------
+  - name: Overlay Display Name
+    id: overlay_display_name
+    task: format_optional_name
+    skipif:
+      conditions: []
+    partial:
+      name: ${{ workflow.overlay_name.return }}
+
+  - name: Widget - Overlay
+    id: widget_overlay
+    task: create_text_widget_single_view
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      title: Overlay
+      data: ${{ workflow.overlay_display_name.return }}
+
+  # --- Mean dNBR (burn intensity summary) ------------------------------------
+  - name: Mean dNBR
+    id: mean_dnbr
+    task: count_mean_dnbr
+    partial:
+      geodataframe: ${{ workflow.dnbr_result.return }}
+
+  - name: Mean dNBR Formatted
+    id: mean_dnbr_fmt
+    task: format_mean_dnbr
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      dnbr_value: ${{ workflow.mean_dnbr.return }}
+
+  - name: Widget - dNBR Avg
+    id: widget_mean_dnbr
+    task: create_text_widget_single_view
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      title: dNBR Avg
+      data: ${{ workflow.mean_dnbr_fmt.return }}
+
+  # --- Pre-fire scene count (observability) ----------------------------------
+  - name: Pre Scenes
+    id: pre_scenes
+    task: count_pre_images
+    partial:
+      geodataframe: ${{ workflow.dnbr_result.return }}
+
+  - name: Pre Scenes Formatted
+    id: pre_scenes_fmt
+    task: format_image_count
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      count: ${{ workflow.pre_scenes.return }}
+
+  - name: Widget - Pre Imgs
+    id: widget_pre_scenes
+    task: create_text_widget_single_view
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      title: Pre Imgs
+      data: ${{ workflow.pre_scenes_fmt.return }}
+
+  # --- Post-fire scene count (observability) ---------------------------------
+  - name: Post Scenes
+    id: post_scenes
+    task: count_post_images
+    partial:
+      geodataframe: ${{ workflow.dnbr_result.return }}
+
+  - name: Post Scenes Formatted
+    id: post_scenes_fmt
+    task: format_image_count
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      count: ${{ workflow.post_scenes.return }}
+
+  - name: Widget - Post Imgs
+    id: widget_post_scenes
+    task: create_text_widget_single_view
+    skipif:
+      conditions:
+        - any_dependency_skipped
+    partial:
+      title: Post Imgs
+      data: ${{ workflow.post_scenes_fmt.return }}
+
+  # --- Dashboard --------------------------------------------------------------
+  - name: Dashboard
+    id: dashboard
+    task: gather_dashboard
+    partial:
+      details: ${{ workflow.workflow_details.return }}
+      widgets:
+        - ${{ workflow.widget_burned.return }}
+        - ${{ workflow.widget_high_severity.return }}
+        - ${{ workflow.widget_fire_date.return }}
+        - ${{ workflow.widget_overlay.return }}
+        - ${{ workflow.widget_mean_dnbr.return }}
+        - ${{ workflow.widget_pre_scenes.return }}
+        - ${{ workflow.widget_post_scenes.return }}
+        - ${{ workflow.map_widget.return }}
+      time_range: ~
+
+task-instance-defaults:
+  skipif:
+    conditions:
+      - any_is_empty_df
+      - any_dependency_skipped

@@ -1,0 +1,43 @@
+{
+  "workflow_details": {
+    "name": "Fire Severity dNBR",
+    "description": "Landsat dNBR fire severity map from an EarthRanger fire event polygon"
+  },
+  "er_connection": {
+    "data_source": {
+      "name": "<your-data-source>"
+    }
+  },
+  "gee_connection": {
+    "data_source": {
+      "name": "<your-gee-connection>"
+    }
+  },
+  "fire_event": {
+    "event_type": "controlled_burn",
+    "serial_number": 1
+  },
+  "overlay_name": {
+    "group_name": ""
+  },
+  "base_maps": {
+    "base_maps": [
+      {
+        "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+        "opacity": 1
+      },
+      {
+        "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        "opacity": 0.5
+      }
+    ]
+  },
+  "dnbr_result": {
+    "pre_fire_days": 365,
+    "post_fire_days": 60,
+    "scale": 100
+  },
+  "dnbr_layer": {
+    "opacity": 0.85
+  }
+}

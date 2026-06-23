@@ -1,0 +1,13 @@
+.pixi
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.env
+.venv
+.DS_Store
+Thumbs.db
+.tmp
+.scratch

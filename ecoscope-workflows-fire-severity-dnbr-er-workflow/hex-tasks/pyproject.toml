@@ -1,0 +1,16 @@
+[project]
+name = "hex-tasks"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "h3>=4.0",
+    "geopandas",
+    "wt-registry>=0.2,<1",
+]
+
+[project.entry-points."wt_registry"]
+hex_tasks = "hex_tasks"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
