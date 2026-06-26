@@ -72,6 +72,29 @@
       "type": "object",
       "title": "Fire Event"
     },
+    "overlay_name": {
+      "additionalProperties": false,
+      "properties": {
+        "group_name": {
+          "default": "",
+          "title": "Overlay Layer Group Name",
+          "type": "string",
+          "description": "Name of an EarthRanger spatial features group to display as an extra layer on top of the map (e.g. 'Roads', 'Fencelines', 'Water Sources'). Find it in ER under Admin \u2192 Map Layers \u2192 Feature Groups. Leave blank to add no overlay layer.",
+          "ecoscope:transform": [
+            {
+              "transformer": "EarthRangerEnumResolver",
+              "transformer_kws": {
+                "type": "spatial_feature_group",
+                "depends_on": "properties.er_connection.properties.data_source.properties.name"
+              }
+            }
+          ]
+        }
+      },
+      "type": "object",
+      "required": [],
+      "title": "Overlay Layer Group Name"
+    },
     "base_maps": {
       "additionalProperties": false,
       "properties": {
@@ -381,6 +404,7 @@
       "er_connection",
       "gee_connection",
       "fire_event",
+      "overlay_name",
       "base_maps",
       "dnbr_result",
       "dnbr_layer"

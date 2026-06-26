@@ -89,6 +89,32 @@ def _nbr_l57(img):
 # ── Registered tasks ─────────────────────────────────────────────────────────
 
 @register()
+def set_overlay_group_name(
+    group_name: Annotated[
+        str,
+        Field(
+            title="Overlay Layer Group Name",
+            description=(
+                "Name of an EarthRanger spatial features group to display as an extra layer "
+                "on top of the map (e.g. 'Roads', 'Fencelines', 'Water Sources'). "
+                "Find it in ER under Admin → Map Layers → Feature Groups. "
+                "Leave blank to add no overlay layer."
+            ),
+            default="",
+        ),
+    ] = "",
+) -> str:
+    """Return the overlay group name as-is; exists only to expose a labelled form field."""
+    return group_name
+
+
+@register()
+def format_optional_name(name: str = "") -> str:
+    """Return name if set, otherwise 'Not set'. Used for optional overlay widget."""
+    return name if name else "Not set"
+
+
+@register()
 def set_fire_date(
     fire_date: Annotated[
         str,
@@ -368,12 +394,13 @@ def create_dnbr_layer(
 def combine_dnbr_layers(
     dnbr_layer: Any,
     perimeter_layer: Any,
+    overlay_layer: Any = None,
 ) -> Any:
-    """Combine the dNBR severity layer with the fire perimeter overlay for draw_ecomap.
+    """Combine dNBR layer + fire perimeter outline + optional user overlay for draw_ecomap.
 
-    Perimeter overlay goes on top of the dNBR pixels so the user can see
-    where the burn scar polygon was drawn in EarthRanger. Handles SkipSentinel
-    so a skipped dNBR layer propagates correctly.
+    perimeter_layer is always the fire event polygon (automatic, no user input).
+    overlay_layer is an optional user-specified ER spatial feature group (fencelines,
+    roads, water points, etc.) — pass a SkipSentinel or None to omit it.
     """
     from wt_task.skip import SkipSentinel
 
@@ -385,6 +412,11 @@ def combine_dnbr_layers(
             layers.extend(perimeter_layer)
         else:
             layers.append(perimeter_layer)
+    if not isinstance(overlay_layer, SkipSentinel) and overlay_layer is not None:
+        if isinstance(overlay_layer, list):
+            layers.extend(overlay_layer)
+        else:
+            layers.append(overlay_layer)
     return layers
 
 
