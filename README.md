@@ -1,6 +1,6 @@
 # Fire Severity dNBR — EarthRanger Workflow
 
-An [Ecoscope Desktop](https://ecoscope.io) workflow that measures **how severely a fire burned** across its perimeter, using satellite imagery from Landsat and Google Earth Engine. Fire perimeter and date are pulled directly from an EarthRanger event — no manual file uploads needed.
+An [Ecoscope Desktop](https://ecoscope.io) workflow that measures **how severely a fire burned** across its perimeter, using satellite imagery from Landsat and Google Earth Engine. The fire perimeter polygon and date are pulled directly from an EarthRanger event — no manual file uploads needed. The perimeter is automatically shown as an orange outline on the map. An optional overlay from any EarthRanger spatial feature group (fencelines, roads, water sources, etc.) can also be added.
 
 ---
 
@@ -26,6 +26,11 @@ Rather than using a single satellite image, this workflow follows the **mean com
 ## What does each output mean?
 
 ### Severity map
+The map shows three layers stacked on top of each other:
+- **dNBR severity pixels** — each pixel coloured by severity class (see table below)
+- **Fire perimeter outline** — the EarthRanger polygon shown as an orange border, always present automatically
+- **Optional overlay** — any EarthRanger spatial feature group you choose (fencelines, roads, water sources, etc.), also in orange
+
 Each pixel in the fire perimeter is coloured by severity class:
 
 | Colour | Class | dNBR range | What it means |
@@ -46,7 +51,7 @@ Thresholds follow the USGS Key & Benson (2006) standard, the most widely adopted
 | **Burned** | Total area classified as Low severity or higher (ha or km²) |
 | **High Sev** | Area classified as Moderate-High or High severity — the most ecologically significant portion |
 | **Date** | Fire date extracted from the EarthRanger event |
-| **Overlay** | Name of the optional overlay layer (or blank if none selected) |
+| **Overlay** | Name of the optional overlay layer (shows "Not set" if none selected) |
 | **dNBR Avg** | Mean dNBR across all pixels — a single-number summary of overall burn intensity |
 | **Pre Imgs** | Number of Landsat scenes used in the pre-fire composite — higher is more reliable |
 | **Post Imgs** | Number of Landsat scenes used in the post-fire composite — higher is more reliable |
