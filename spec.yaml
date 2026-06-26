@@ -1,4 +1,4 @@
-id: fire_severity_dnbr_er
+id: fire_severity_dnbr
 
 requirements:
   - name: "ecoscope-platform"

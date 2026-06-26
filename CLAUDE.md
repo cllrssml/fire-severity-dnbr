@@ -1,4 +1,4 @@
-# fire_severity_dnbr_er — workflow notes
+# fire-severity-dnbr — workflow notes
 
 Fire severity map using Landsat/GEE dNBR. Fire perimeter fetched automatically
 from an ER fire event by serial number. The fire event polygon is always shown
@@ -11,7 +11,7 @@ Custom package: `dnbr-tasks` only (`create_styled_overlay_layer`, `combine_dnbr_
 
 ---
 
-## Task chain (v6.0.0)
+## Task chain (v6.1.0)
 
 `set_workflow_details` → `set_er_connection` → `set_gee_connection` →
 `load_fire_event_from_er` (custom; fetches polygon from ER by serial number) →
@@ -40,7 +40,7 @@ only — never `any_dependency_skipped`. The task inspects overlay_layer for Ski
 itself and omits it gracefully. Adding `any_dependency_skipped` would cause the entire
 map to skip whenever the overlay is left blank.
 
-## Dashboard layout (v6.0.0)
+## Dashboard layout (v6.1.0)
 
 8 widgets — `widget_id` order matches `gather_dashboard` widgets list:
 
@@ -71,4 +71,4 @@ cd ecoscope-workflows-*-workflow && pixi install && cd ..
 ## GitHub
 
 Repo: https://github.com/cllrssml/fire-severity-dnbr
-Published at v5.0.0. v6.0.0 (optional overlay layer) pending push.
+Current published version: v6.1.0 (naming cleanup: dropped -er suffix from spec id and all folder names).
