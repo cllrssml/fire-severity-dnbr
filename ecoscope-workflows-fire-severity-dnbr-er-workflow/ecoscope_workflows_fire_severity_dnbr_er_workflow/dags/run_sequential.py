@@ -3,6 +3,7 @@ import os
 from typing import Any
 
 from dnbr_tasks import calculate_dnbr as calculate_dnbr
+from dnbr_tasks import combine_dnbr_layers as combine_dnbr_layers
 from dnbr_tasks import count_burned_area_ha as count_burned_area_ha
 from dnbr_tasks import count_high_severity_area_ha as count_high_severity_area_ha
 from dnbr_tasks import count_mean_dnbr as count_mean_dnbr
@@ -16,9 +17,6 @@ from dnbr_tasks import format_image_count as format_image_count
 from dnbr_tasks import format_mean_dnbr as format_mean_dnbr
 from dnbr_tasks import load_fire_event_from_er as load_fire_event_from_er
 from ecoscope.platform.tasks.config import set_workflow_details as set_workflow_details
-from ecoscope.platform.tasks.io import (
-    get_spatial_features_group as get_spatial_features_group,
-)
 from ecoscope.platform.tasks.io import persist_text as persist_text
 from ecoscope.platform.tasks.io import set_er_connection as set_er_connection
 from ecoscope.platform.tasks.io import set_gee_connection as set_gee_connection
@@ -32,16 +30,10 @@ from ecoscope.platform.tasks.results import draw_ecomap as draw_ecomap
 from ecoscope.platform.tasks.results import gather_dashboard as gather_dashboard
 from ecoscope.platform.tasks.results import set_base_maps as set_base_maps
 from ecoscope.platform.tasks.skip import (
-    any_dependency_is_empty_string as any_dependency_is_empty_string,
-)
-from ecoscope.platform.tasks.skip import (
     any_dependency_skipped as any_dependency_skipped,
 )
 from ecoscope.platform.tasks.skip import any_is_empty_df as any_is_empty_df
 from ecoscope.platform.tasks.skip import never as never
-from hex_tasks import combine_map_layers as combine_map_layers
-from hex_tasks import format_optional_name as format_optional_name
-from hex_tasks import set_overlay_group_name as set_overlay_group_name
 from wt_contracts import validate as _validate
 from wt_task import task
 
@@ -137,43 +129,6 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
-    overlay_name = (
-        task(set_overlay_group_name)
-        .validate()
-        .set_task_instance_id("overlay_name")
-        .handle_errors()
-        .with_tracing()
-        .skipif(
-            conditions=[
-                any_is_empty_df,
-                any_dependency_skipped,
-            ],
-            unpack_depth=1,
-        )
-        .partial(**(params.get("overlay_name") or {}))
-        .call()
-    )
-
-    overlay_features = (
-        task(get_spatial_features_group)
-        .validate()
-        .set_task_instance_id("overlay_features")
-        .handle_errors()
-        .with_tracing()
-        .skipif(
-            conditions=[
-                any_dependency_is_empty_string,
-            ],
-            unpack_depth=1,
-        )
-        .partial(
-            client=er_connection,
-            spatial_features_group_name=overlay_name,
-            **(params.get("overlay_features") or {}),
-        )
-        .call()
-    )
-
     base_maps = (
         task(set_base_maps)
         .validate()
@@ -230,25 +185,25 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
-    overlay_layer = (
+    perimeter_layer = (
         task(create_styled_overlay_layer)
         .validate()
-        .set_task_instance_id("overlay_layer")
+        .set_task_instance_id("perimeter_layer")
         .handle_errors()
         .with_tracing()
         .skipif(
             conditions=[
-                any_dependency_skipped,
                 any_is_empty_df,
+                any_dependency_skipped,
             ],
             unpack_depth=1,
         )
-        .partial(geodataframe=overlay_features, **(params.get("overlay_layer") or {}))
+        .partial(geodataframe=fire_event, **(params.get("perimeter_layer") or {}))
         .call()
     )
 
     combined_layers = (
-        task(combine_map_layers)
+        task(combine_dnbr_layers)
         .validate()
         .set_task_instance_id("combined_layers")
         .handle_errors()
@@ -260,9 +215,8 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             unpack_depth=1,
         )
         .partial(
-            hex_layer=dnbr_layer,
-            boundary_layer=None,
-            overlay_layer=overlay_layer,
+            dnbr_layer=dnbr_layer,
+            perimeter_layer=perimeter_layer,
             **(params.get("combined_layers") or {}),
         )
         .call()
@@ -456,40 +410,6 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
-    overlay_display_name = (
-        task(format_optional_name)
-        .validate()
-        .set_task_instance_id("overlay_display_name")
-        .handle_errors()
-        .with_tracing()
-        .skipif(
-            conditions=[],
-            unpack_depth=1,
-        )
-        .partial(name=overlay_name, **(params.get("overlay_display_name") or {}))
-        .call()
-    )
-
-    widget_overlay = (
-        task(create_text_widget_single_view)
-        .validate()
-        .set_task_instance_id("widget_overlay")
-        .handle_errors()
-        .with_tracing()
-        .skipif(
-            conditions=[
-                any_dependency_skipped,
-            ],
-            unpack_depth=1,
-        )
-        .partial(
-            title="Overlay",
-            data=overlay_display_name,
-            **(params.get("widget_overlay") or {}),
-        )
-        .call()
-    )
-
     mean_dnbr = (
         task(count_mean_dnbr)
         .validate()
@@ -668,7 +588,6 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
                 widget_burned,
                 widget_high_severity,
                 widget_fire_date,
-                widget_overlay,
                 widget_mean_dnbr,
                 widget_pre_scenes,
                 widget_post_scenes,

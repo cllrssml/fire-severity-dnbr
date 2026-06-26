@@ -50,10 +50,6 @@ channel = "https://repo.prefix.dev/ecoscope-workflows/"
 path = "./dnbr-tasks"
 editable = true
 
-[pypi-dependencies.hex-tasks]
-path = "./hex-tasks"
-editable = true
-
 [feature.runner.dependencies.wt-runner]
 version = ">=0.3.0,<1.0.0"
 channel = "https://repo.prefix.dev/ecoscope-workflows/"

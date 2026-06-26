@@ -7,17 +7,6 @@ requirements:
   - name: "dnbr-tasks"
     path: "/home/sam/Ecoscope_Projects/dnbr-tasks"
     editable: true
-  - name: "hex-tasks"
-    path: "/home/sam/Ecoscope_Projects/hex-tasks"
-    editable: true
-
-rjsf-overrides:
-  properties:
-    overlay_name.properties.group_name.ecoscope:transform:
-      - transformer: EarthRangerEnumResolver
-        transformer_kws:
-          type: spatial_feature_group
-          depends_on: properties.er_connection.properties.data_source.properties.name
 
 workflow:
 
@@ -50,22 +39,6 @@ workflow:
     partial:
       event_gdf: ${{ workflow.fire_event.return }}
 
-  # --- Optional overlay group name (leave blank to skip overlay layer) --------
-  - name: Overlay Layer Group Name
-    id: overlay_name
-    task: set_overlay_group_name
-
-  # --- Fetch overlay from ER (skipped if name is empty) ----------------------
-  - name: Overlay Features
-    id: overlay_features
-    task: get_spatial_features_group
-    skipif:
-      conditions:
-        - any_dependency_is_empty_string
-    partial:
-      client: ${{ workflow.er_connection.return }}
-      spatial_features_group_name: ${{ workflow.overlay_name.return }}
-
   # --- Basemap picker ----------------------------------------------------------
   - name: Base Maps
     id: base_maps
@@ -87,28 +60,23 @@ workflow:
     partial:
       geodataframe: ${{ workflow.dnbr_result.return }}
 
-  # --- Overlay layer ----------------------------------------------------------
-  - name: Overlay Layer
-    id: overlay_layer
+  # --- Fire perimeter outline (always shown — same polygon used as the GEE ROI)
+  - name: Perimeter Layer
+    id: perimeter_layer
     task: create_styled_overlay_layer
-    skipif:
-      conditions:
-        - any_dependency_skipped
-        - any_is_empty_df
     partial:
-      geodataframe: ${{ workflow.overlay_features.return }}
+      geodataframe: ${{ workflow.fire_event.return }}
 
-  # --- Combine dNBR severity layer + optional overlay -------------------------
+  # --- Combine dNBR severity layer + fire perimeter outline -------------------
   - name: Combined Layers
     id: combined_layers
-    task: combine_map_layers
+    task: combine_dnbr_layers
     skipif:
       conditions:
         - any_is_empty_df
     partial:
-      hex_layer: ${{ workflow.dnbr_layer.return }}
-      boundary_layer: ~
-      overlay_layer: ${{ workflow.overlay_layer.return }}
+      dnbr_layer: ${{ workflow.dnbr_layer.return }}
+      perimeter_layer: ${{ workflow.perimeter_layer.return }}
 
   # --- Render fire severity map -----------------------------------------------
   - name: Fire Severity Map
@@ -225,25 +193,6 @@ workflow:
       title: Date
       data: ${{ workflow.fire_date.return }}
 
-  # --- Overlay display name (shows "—" if no overlay selected) ---------------
-  - name: Overlay Display Name
-    id: overlay_display_name
-    task: format_optional_name
-    skipif:
-      conditions: []
-    partial:
-      name: ${{ workflow.overlay_name.return }}
-
-  - name: Widget - Overlay
-    id: widget_overlay
-    task: create_text_widget_single_view
-    skipif:
-      conditions:
-        - any_dependency_skipped
-    partial:
-      title: Overlay
-      data: ${{ workflow.overlay_display_name.return }}
-
   # --- Mean dNBR (burn intensity summary) ------------------------------------
   - name: Mean dNBR
     id: mean_dnbr
@@ -332,7 +281,6 @@ workflow:
         - ${{ workflow.widget_burned.return }}
         - ${{ workflow.widget_high_severity.return }}
         - ${{ workflow.widget_fire_date.return }}
-        - ${{ workflow.widget_overlay.return }}
         - ${{ workflow.widget_mean_dnbr.return }}
         - ${{ workflow.widget_pre_scenes.return }}
         - ${{ workflow.widget_post_scenes.return }}

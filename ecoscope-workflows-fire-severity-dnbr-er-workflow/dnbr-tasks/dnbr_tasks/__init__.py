@@ -364,6 +364,30 @@ def create_dnbr_layer(
     )
 
 
+@register(tags=["fire"])
+def combine_dnbr_layers(
+    dnbr_layer: Any,
+    perimeter_layer: Any,
+) -> Any:
+    """Combine the dNBR severity layer with the fire perimeter overlay for draw_ecomap.
+
+    Perimeter overlay goes on top of the dNBR pixels so the user can see
+    where the burn scar polygon was drawn in EarthRanger. Handles SkipSentinel
+    so a skipped dNBR layer propagates correctly.
+    """
+    from wt_task.skip import SkipSentinel
+
+    if isinstance(dnbr_layer, SkipSentinel):
+        return dnbr_layer
+    layers = [dnbr_layer]
+    if not isinstance(perimeter_layer, SkipSentinel) and perimeter_layer is not None:
+        if isinstance(perimeter_layer, list):
+            layers.extend(perimeter_layer)
+        else:
+            layers.append(perimeter_layer)
+    return layers
+
+
 @register(tags=["fire", "stats"])
 def count_burned_area_ha(geodataframe: _GDF) -> float:
     """
